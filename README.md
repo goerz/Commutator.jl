@@ -2,6 +2,7 @@
 
 [![Build Status](https://travis-ci.org/goerz/Commutator.jl.svg?branch=master)](https://travis-ci.org/goerz/Commutator.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/u3g21e0h9dwd3a6u/branch/master?svg=true)](https://ci.appveyor.com/project/goerz/commutator-jl/branch/master)
+[![codecov](https://codecov.io/gh/goerz/Commutator.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/goerz/Commutator.jl)
 
 
 This package provides the function `commutator!` that calculates the
