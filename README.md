@@ -1,5 +1,7 @@
 # Commutator
 
+[![Build Status](https://travis-ci.org/goerz/Commutator.jl.svg?branch=master)](https://travis-ci.org/goerz/Commutator.jl)
+
 This package provides the function `commutator!` that calculates the
 [commutator](https://en.wikipedia.org/wiki/Commutator)
 `[A, B]` of two ring elements `A`, `B`. That is,
