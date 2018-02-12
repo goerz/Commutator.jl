@@ -2,10 +2,12 @@ using Commutator: commutator!
 using Base.Test
 
 using MicroLogging
+using BenchmarkTools
 
 configure_logging(min_level=:info)
 #=configure_logging(min_level=:debug)=#
 
+SUITE = BenchmarkGroup()
 
 #==============================================================================
                                  SUPPORT
@@ -87,6 +89,12 @@ function mysprand(S, n, m, p)
 end
 
 
+"""String representation of a number of two-digit precision (for labels)"""
+reprnum(v) = repr(v)
+reprnum(v::Float64) = @sprintf("%.2f", v)
+reprnum(v::Complex128) =  @sprintf("%.2f%+.2fim", real(v), imag(v))
+
+
 #==============================================================================
                                   TESTS
 ==============================================================================#
@@ -110,16 +118,28 @@ commutator!(α, A, B, β, C)
 @testset "commutator!" begin
 
 
+SUITE["NDM"] = BenchmarkGroup(["commutator"])
 @testset "numerical dense matrices; T=$T, β=$β, N=$N" for
         T ∈ (Complex128, Float64),
         β ∈ (0, 1, -1, rand(T)),
         N ∈ (4, 500)
     α, A, B, C = rand(T), rand(T, N, N), rand(T, N, N), rand(T, N, N)
+    C2 = copy(C); C3 = copy(C)
+    t_super = (Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix)
+    t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
     @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
+    label = "T=$T, β=$(reprnum(β)), N=$N"
+    SUITE["NDM"]["$label - super"] =
+        @benchmarkable invoke(commutator!, $t_super, $α, $A, $B, $β, $C2)
+    SUITE["NDM"]["$label - invoke"] =
+        @benchmarkable invoke(commutator!, $t_args, $α, $A, $B, $β, $C3)
+    SUITE["NDM"]["$label - direct"] =
+        @benchmarkable commutator!($α, $A, $B, $β, $C)
 end
 
 
-@testset "numerical dense matrices (mixed types); S = $T, T=$T, β=$β" for
+SUITE["NDMMT"] = BenchmarkGroup(["commutator"])
+@testset "numerical dense matrices (mixed types); S = $S, T=$T, β=$β" for
         S ∈ (Complex128, Float64, Int),
         T ∈ (Complex128, Float64, Int),
         β ∈ (myrand(T), myrand(S))
@@ -128,10 +148,21 @@ end
     N = 4
     α, A, B, C = (
         myrand(T), myrand(S, N, N), myrand(T, N, N), myrand(Complex128, N, N))
+    C2 = copy(C); C3 = copy(C)
+    t_super = (Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix)
+    t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
     @test check_commutator(α, A, B, β, C)
+    label = "S=$S, T=$T, β=$(reprnum(β)), N=$N"
+    SUITE["NDMMT"]["$label - super"] =
+        @benchmarkable invoke(commutator!, $t_super, $α, $A, $B, $β, $C2)
+    SUITE["NDMMT"]["$label - invoke"] =
+        @benchmarkable invoke(commutator!, $t_args, $α, $A, $B, $β, $C3)
+    SUITE["NDMMT"]["$label - direct"] =
+        @benchmarkable commutator!($α, $A, $B, $β, $C)
 end
 
 
+SUITE["SPA"] = BenchmarkGroup(["commutator"])
 @testset "sparse A; S = $S, T=$T" for
         S ∈ (Complex128, Float64, Int),
         T ∈ (Complex128, Float64, Int)
@@ -141,14 +172,40 @@ end
             α, A, B, C = (
                 myrand(T), mysprand(S, N, N, 0.3), myrand(T, N, N),
                 myrand(S, N, N))
+            C2 = copy(C); C3 = copy(C)
+            t_super = (Number, AbstractMatrix, AbstractMatrix, Number,
+                       AbstractMatrix)
+            t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
             @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
+            label = "S=$S, T=$T, β=$(reprnum(β)), N=$N"
+            SUITE["SPA"]["$label - super"] =
+                @benchmarkable invoke(commutator!, $t_super, $α, $A, $B, $β,
+                                      $C2)
+            SUITE["SPA"]["$label - invoke"] =
+                @benchmarkable invoke(commutator!, $t_args, $α, $A, $B, $β,
+                                      $C3)
+            SUITE["SPA"]["$label - direct"] =
+                @benchmarkable commutator!($α, $A, $B, $β, $C)
         end
     else
         for β ∈ (0, 1, -1, myrand(Complex128))
             α, A, B, C = (
                 myrand(T), mysprand(S, N, N, 0.3), myrand(T, N, N),
                 myrand(Complex128, N, N))
+            C2 = copy(C); C3 = copy(C)
+            t_super = (Number, AbstractMatrix, AbstractMatrix, Number,
+                       AbstractMatrix)
+            t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
             @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
+            label = "S=$S, T=$T, β=$(reprnum(β)), N=$N"
+            SUITE["SPA"]["$label - super"] =
+                @benchmarkable invoke(commutator!, $t_super, $α, $A, $B, $β,
+                                      $C2)
+            SUITE["SPA"]["$label - invoke"] =
+                @benchmarkable invoke(commutator!, $t_args, $α, $A, $B, $β,
+                                      $C3)
+            SUITE["SPA"]["$label - direct"] =
+                @benchmarkable commutator!($α, $A, $B, $β, $C)
         end
     end
 end
