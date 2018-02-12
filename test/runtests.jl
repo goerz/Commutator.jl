@@ -111,18 +111,18 @@ commutator!(α, A, B, β, C)
 
 
 @testset "numerical dense matrices; T=$T, β=$β, N=$N" for
-        T ∈ [Complex128, Float64],
-        β ∈ Any[0, 1, -1, rand(T)],
-        N ∈ [4, 500]
+        T ∈ (Complex128, Float64),
+        β ∈ (0, 1, -1, rand(T)),
+        N ∈ (4, 500)
     α, A, B, C = rand(T), rand(T, N, N), rand(T, N, N), rand(T, N, N)
     @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
 end
 
 
 @testset "numerical dense matrices (mixed types); S = $T, T=$T, β=$β" for
-        S ∈ [Complex128, Float64, Int],
-        T ∈ [Complex128, Float64, Int],
-        β ∈ Any[myrand(T), myrand(S)]
+        S ∈ (Complex128, Float64, Int),
+        T ∈ (Complex128, Float64, Int),
+        β ∈ (myrand(T), myrand(S))
     # these generally cannot be mapped to gemm! and may require allocation of
     # temporary storage
     N = 4
