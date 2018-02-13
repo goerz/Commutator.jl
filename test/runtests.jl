@@ -24,6 +24,14 @@ function commutator(alpha, A, B, beta, C)
 end
 
 
+"""The "naive" in-place implementation"""
+function commutator_super!(
+        alpha::Number, A::AbstractMatrix, B::AbstractMatrix, beta::Number,
+        C::AbstractMatrix)
+    C[:,:] = beta * C[:,:] + alpha * (A * B - B * A)
+end
+
+
 """
 Check the correctness of `commutator!(α, A, B, β, C)`. If
 `enforce_noalloc=true`, also ensure that the call to `commutator!` causes zero
@@ -72,18 +80,6 @@ function check_commutator(α, A, B, β, C; enforce_noalloc=false)
     end
     @debug "--------------------------------"
     return result
-end
-
-
-"""Run the commutator function in order to eliminate JIT-overhead"""
-function warmup(α, A, B, β, C)
-    C = copy(C)
-    commutator!(α, A, B, β, C)
-end
-
-function warmup(α, A, B, β, C, invoke_types)
-    C = copy(C)
-    invoke(commutator!, invoke_types, α, A, B, β, C)
 end
 
 
@@ -150,25 +146,14 @@ SUITE["NDM"] = BenchmarkGroup(["commutator"])
         β ∈ (0, 1, -1, rand(T)),
         N ∈ (4, 500)
     α, A, B, C = rand(T), rand(T, N, N), rand(T, N, N), rand(T, N, N)
-    C2 = copy(C); C3 = copy(C)
     t_super = (Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix)
     t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
     @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
     label = "T=$T, β=$(reprnum(β)), N=$N"
     SUITE["NDM"]["$label - super"] =
-        @benchmarkable(
-            invoke(commutator!, $t_super, $α, $A, $B, $β, Cb),
-            setup=(Cb = copy($C)))
-    warmup(α, A, B, β, C, t_args)
-    SUITE["NDM"]["$label - invoke"] =
-        @benchmarkable(
-            invoke(commutator!, $t_args, $α, $A, $B, $β, Cb),
-            setup=(Cb = copy($C)))
-    warmup(α, A, B, β, C)
+        @benchmarkable(commutator_super!($α, $A, $B, $β, Cb), setup=(Cb=copy($C)))
     SUITE["NDM"]["$label - direct"] =
-        @benchmarkable(
-            commutator!($α, $A, $B, $β, Cb),
-            setup=(Cb = copy($C)))
+        @benchmarkable(commutator!($α, $A, $B, $β, Cb), setup=(Cb=copy($C)))
 end
 
 
@@ -186,21 +171,10 @@ SUITE["NDMMT"] = BenchmarkGroup(["commutator"])
     t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
     @test check_commutator(α, A, B, β, C)
     label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
-    warmup(α, A, B, β, C, t_super)
-    SUITE["NDMMT"]["$label - super"] =
-        @benchmarkable(
-            invoke(commutator!, $t_super, $α, $A, $B, $β, Cb),
-            setup=(Cb = copy($C)))
-    warmup(α, A, B, β, C, t_args)
-    SUITE["NDMMT"]["$label - invoke"] =
-        @benchmarkable(
-            invoke(commutator!, $t_args, $α, $A, $B, $β, Cb),
-            setup=(Cb = copy($C)))
-    warmup(α, A, B, β, C)
     SUITE["NDMMT"]["$label - direct"] =
-        @benchmarkable(
-            commutator!($α, $A, $B, $β, Cb),
-            setup=(Cb = copy($C)))
+        @benchmarkable(commutator!($α, $A, $B, $β, Cb), setup=(Cb = copy($C)))
+    SUITE["NDMMT"]["$label - super"] =
+        @benchmarkable(commutator_super!($α, $A, $B, $β, Cb), setup=(Cb=copy($C)))
 end
 
 
@@ -219,21 +193,10 @@ SUITE["SPA"] = BenchmarkGroup(["commutator"])
             t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
             @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
             label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
-            warmup(α, A, B, β, C, t_super)
-            SUITE["SPA"]["$label - super"] =
-                @benchmarkable(
-                    invoke(commutator!, $t_super, $α, $A, $B, $β, Cb),
-                    setup=(Cb = copy($C)))
-            warmup(α, A, B, β, C, t_args)
-            SUITE["SPA"]["$label - invoke"] =
-                @benchmarkable(
-                    invoke(commutator!, $t_args, $α, $A, $B, $β, Cb),
-                    setup=(Cb = copy($C)))
-            warmup(α, A, B, β, C)
             SUITE["SPA"]["$label - direct"] =
-                @benchmarkable(
-                    commutator!($α, $A, $B, $β, Cb),
-                    setup=(Cb = copy($C)))
+                @benchmarkable(commutator!($α, $A, $B, $β, Cb), setup=(Cb = copy($C)))
+            SUITE["SPA"]["$label - super"] =
+                @benchmarkable(commutator_super!($α, $A, $B, $β, Cb), setup=(Cb=copy($C)))
         end
     else  # S ≠ T
         for β ∈ (0, 1, -1, myrand(Complex128))
@@ -246,21 +209,10 @@ SUITE["SPA"] = BenchmarkGroup(["commutator"])
             t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
             @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
             label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
-            warmup(α, A, B, β, C, t_super)
-            SUITE["SPA"]["$label - super"] =
-                @benchmarkable(
-                    invoke(commutator!, $t_super, $α, $A, $B, $β, Cb),
-                    setup=(Cb = copy($C)))
-            warmup(α, A, B, β, C, t_args)
-            SUITE["SPA"]["$label - invoke"] =
-                @benchmarkable(
-                    invoke(commutator!, $t_args, $α, $A, $B, $β, Cb),
-                    setup=(Cb = copy($C)))
-            warmup(α, A, B, β, C)
             SUITE["SPA"]["$label - direct"] =
-                @benchmarkable(
-                    commutator!($α, $A, $B, $β, Cb),
-                    setup=(Cb = copy($C)))
+                @benchmarkable(commutator!($α, $A, $B, $β, Cb), setup=(Cb = copy($C)))
+            SUITE["SPA"]["$label - super"] =
+                @benchmarkable(commutator_super!($α, $A, $B, $β, Cb), setup=(Cb=copy($C)))
         end
     end
 end
