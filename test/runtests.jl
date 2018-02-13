@@ -93,13 +93,37 @@ function myrand(S, dims...)
 end
 
 
-"""Custom sprand function that returns small values for integers"""
-function mysprand(S, n, m, p)
-    if S<:Int
-        return rand(1:1000, n, m) .* sprand(Bool, n, m, p)
-    else
-        return sprand(S, n, m, p)
+SPRAND_DICT = Dict()
+SPRAND_DUMP = joinpath(dirname(@__FILE__), "sprand.dump")
+if isfile(SPRAND_DUMP)
+    @info "Loading SPRAND_DICT from $SPRAND_DUMP"
+    open(SPRAND_DUMP) do fh
+        merge!(SPRAND_DICT, deserialize(fh))
     end
+end
+
+
+"""
+Custom sprand function that returns small values for integers
+
+Also caches returned matrices in `SPRAND_DICT` using `key`. This is so that we
+can run repeated benchmarks (within the same REPL session) with the exact same
+number of non-zero elements (nnz) in sparse matrices. Otherwise, since the
+runtime of sparse-operations depends on nnz, we wouldn't be able to compare
+benchmarks
+"""
+function mysprand(S, n, m, p, key)
+    if key ∈ keys(SPRAND_DICT)
+        result = SPRAND_DICT[key]
+    else
+        if S<:Int
+            result = rand(1:1000, n, m) .* sprand(Bool, n, m, p)
+        else
+            result = sprand(S, n, m, p)
+        end
+        SPRAND_DICT[key] = result
+    end
+    return result
 end
 
 
@@ -122,21 +146,6 @@ end
 ==============================================================================#
 
 
-#=
-#---------------------------------------
-N = 4
-S = Complex128
-T = Int
-β = 0
-α = myrand(T)
-A, B, C = (
-    mysprand(S, N, N, 0.3), myrand(T, N, N), myrand(Complex128, N, N))
-commutator!(α, A, B, β, C)
-@test check_commutator(α, A, B, β, C)
-#-----------------------------------------
-=#
-
-
 @testset "commutator!" begin
 
 
@@ -145,11 +154,11 @@ SUITE["NDM"] = BenchmarkGroup(["commutator"])
         T ∈ (Complex128, Float64),
         β ∈ (0, 1, -1, rand(T)),
         N ∈ (4, 500)
+    label = "T=$T, β=$(reprnum(β)), N=$N"
     α, A, B, C = rand(T), rand(T, N, N), rand(T, N, N), rand(T, N, N)
     t_super = (Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix)
     t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
     @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
-    label = "T=$T, β=$(reprnum(β)), N=$N"
     SUITE["NDM"]["$label - super"] =
         @benchmarkable(commutator_super!($α, $A, $B, $β, Cb), setup=(Cb=copy($C)))
     SUITE["NDM"]["$label - direct"] =
@@ -165,12 +174,12 @@ SUITE["NDMMT"] = BenchmarkGroup(["commutator"])
     # these generally cannot be mapped to gemm! and may require allocation of
     # temporary storage
     N = 4
+    label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
     α, A, B, C = (
         myrand(T), myrand(S, N, N), myrand(T, N, N), myrand(Complex128, N, N))
     t_super = (Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix)
     t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
     @test check_commutator(α, A, B, β, C)
-    label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
     SUITE["NDMMT"]["$label - direct"] =
         @benchmarkable(commutator!($α, $A, $B, $β, Cb), setup=(Cb = copy($C)))
     SUITE["NDMMT"]["$label - super"] =
@@ -185,14 +194,15 @@ SUITE["SPA"] = BenchmarkGroup(["commutator"])
     N = 10
     if S == T
         for β ∈ (0, 1, -1, myrand(S))
+            label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
+            key = "SPA $(label)"
             α, A, B, C = (
-                myrand(T), mysprand(S, N, N, 0.3), myrand(T, N, N),
+                myrand(T), mysprand(S, N, N, 0.3, key), myrand(T, N, N),
                 myrand(S, N, N))
             t_super = (Number, AbstractMatrix, AbstractMatrix, Number,
                        AbstractMatrix)
             t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
             @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
-            label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
             SUITE["SPA"]["$label - direct"] =
                 @benchmarkable(commutator!($α, $A, $B, $β, Cb), setup=(Cb = copy($C)))
             SUITE["SPA"]["$label - super"] =
@@ -200,15 +210,16 @@ SUITE["SPA"] = BenchmarkGroup(["commutator"])
         end
     else  # S ≠ T
         for β ∈ (0, 1, -1, myrand(Complex128))
+            label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
+            key = "SPA $(label)"
             α, A, B, C = (
-                myrand(T), mysprand(S, N, N, 0.3), myrand(T, N, N),
+                myrand(T), mysprand(S, N, N, 0.3, key), myrand(T, N, N),
                 myrand(Complex128, N, N))
             C2 = copy(C); C3 = copy(C)
             t_super = (Number, AbstractMatrix, AbstractMatrix, Number,
                        AbstractMatrix)
             t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
             @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
-            label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
             SUITE["SPA"]["$label - direct"] =
                 @benchmarkable(commutator!($α, $A, $B, $β, Cb), setup=(Cb = copy($C)))
             SUITE["SPA"]["$label - super"] =
@@ -219,3 +230,6 @@ end
 
 
 end
+
+@info "Writing SPRAND_DICT to $SPRAND_DUMP"
+open(SPRAND_DUMP, "w") do fh serialize(fh, SPRAND_DICT) end
