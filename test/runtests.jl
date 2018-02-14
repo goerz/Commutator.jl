@@ -151,8 +151,8 @@ SUITE["NDM"] = BenchmarkGroup(["commutator"])
         N ∈ (4, 500)
     α, A, B, C = rand(T), rand(T, N, N), rand(T, N, N), rand(T, N, N)
     C2 = copy(C); C3 = copy(C)
-    t_super = (Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix)
-    t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
+    t_super = Tuple{Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix}
+    t_args = Tuple{typeof(α), typeof(A), typeof(B), typeof(β), typeof(C)}
     @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
     label = "T=$T, β=$(reprnum(β)), N=$N"
     SUITE["NDM"]["$label - super"] =
@@ -182,8 +182,8 @@ SUITE["NDMMT"] = BenchmarkGroup(["commutator"])
     N = 4
     α, A, B, C = (
         myrand(T), myrand(S, N, N), myrand(T, N, N), myrand(Complex128, N, N))
-    t_super = (Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix)
-    t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
+    t_super = Tuple{Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix}
+    t_args = Tuple{typeof(α), typeof(A), typeof(B), typeof(β), typeof(C)}
     @test check_commutator(α, A, B, β, C)
     label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
     warmup(α, A, B, β, C, t_super)
@@ -214,9 +214,8 @@ SUITE["SPA"] = BenchmarkGroup(["commutator"])
             α, A, B, C = (
                 myrand(T), mysprand(S, N, N, 0.3), myrand(T, N, N),
                 myrand(S, N, N))
-            t_super = (Number, AbstractMatrix, AbstractMatrix, Number,
-                       AbstractMatrix)
-            t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
+            t_super = Tuple{Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix}
+            t_args = Tuple{typeof(α), typeof(A), typeof(B), typeof(β), typeof(C)}
             @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
             label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
             warmup(α, A, B, β, C, t_super)
@@ -241,9 +240,8 @@ SUITE["SPA"] = BenchmarkGroup(["commutator"])
                 myrand(T), mysprand(S, N, N, 0.3), myrand(T, N, N),
                 myrand(Complex128, N, N))
             C2 = copy(C); C3 = copy(C)
-            t_super = (Number, AbstractMatrix, AbstractMatrix, Number,
-                       AbstractMatrix)
-            t_args = (typeof(α), typeof(A), typeof(B), typeof(β), typeof(C))
+            t_super = Tuple{Number, AbstractMatrix, AbstractMatrix, Number, AbstractMatrix}
+            t_args = Tuple{typeof(α), typeof(A), typeof(B), typeof(β), typeof(C)}
             @test check_commutator(α, A, B, β, C; enforce_noalloc=true)
             label = "S=$(reprtype(S)), T=$(reprtype(T)), β=$(reprnum(β)), N=$N"
             warmup(α, A, B, β, C, t_super)
